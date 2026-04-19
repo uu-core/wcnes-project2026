@@ -16,24 +16,13 @@ set(PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
 # Initialize the SDK
 pico_sdk_init()
 
-# include(example_auto_set_url.cmake)
-
-# Hardware-specific examples in subdirectories:
+# 1. Define the executable
 add_executable(carrier_receiver_baseband)
 
-# by default the header is generated into the build dir
-#pico_generate_pio_header(carrier_receiver_baseband ${CMAKE_CURRENT_LIST_DIR}/backscatter.pio)
-# however, alternatively you can choose to generate it somewhere else (in this case in the source tree for check in)
-#pico_generate_pio_header(carrier_receiver_baseband ${CMAKE_CURRENT_LIST_DIR}/backscatter.pio OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR})
+# 2. Add include directories
+include_directories(../project_pico_libs)
 
-target_link_libraries(carrier_receiver_baseband PRIVATE pico_stdlib hardware_pio hardware_spi)
-pico_add_extra_outputs(carrier_receiver_baseband)
-
-# stdout: enable usb output, disable uart output
-pico_enable_stdio_usb(carrier_receiver_baseband 1)
-pico_enable_stdio_uart(carrier_receiver_baseband 0)
-
-# Add include directory 
+# 3. Add all source files
 target_sources(carrier_receiver_baseband PRIVATE 
         main.c
         ../project_pico_libs/packet_generation.c
@@ -41,14 +30,24 @@ target_sources(carrier_receiver_baseband PRIVATE
         ../project_pico_libs/carrier_CC2500.c
         ../project_pico_libs/backscatter.c
 )
-include_directories(../project_pico_libs)
 
-# add url via pico_set_program_url
-# example_auto_set_url(carrier_receiver_baseband)
+# 4. Link standard and hardware libraries
+target_link_libraries(carrier_receiver_baseband PRIVATE 
+        pico_stdlib 
+        hardware_pio 
+        hardware_spi
+)
 
+# 5. Enable USB serial output, disable UART output
+pico_enable_stdio_usb(carrier_receiver_baseband 1)
+pico_enable_stdio_uart(carrier_receiver_baseband 0)
+
+# 6. Generate .uf2, .bin, .hex files
+pico_add_extra_outputs(carrier_receiver_baseband)
+
+# 7. Compiler options
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
         -Wno-unused-function # we have some for the docs that aren't called
         -Wno-maybe-uninitialized
-        )
-
+)
