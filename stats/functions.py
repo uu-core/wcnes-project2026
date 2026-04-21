@@ -32,19 +32,28 @@ def readfile(filename):
         names = ["time_rx", "frame", "rssi"]
     )
     df.dropna(inplace=True)
-    # covert to time data type
-    df.time_rx = df.time_rx.str.rstrip().str.lstrip()
-    df.time_rx = pd.to_datetime(df.time_rx, format='%H:%M:%S.%f')
-    for i in range(len(df)):
-        df.iloc[i,0] = df.iloc[i,0].strftime("%H:%M:%S.%f")
-    # parse the payload to seq and payload
-    df.frame = df.frame.str.rstrip().str.lstrip()
+    
+    # Cleanup time_rx
+    df.time_rx = df.time_rx.str.strip()
+    
+    # Cleanup frame
+    df.frame = df.frame.str.strip()
     df = df[df.frame.str.contains("packet overflow") == False]
+    
+    # NEW: Cleanup RSSI (removes "CRC error" and keeps the number)
+    df.rssi = df.rssi.str.strip().str.split(" ", expand=True).iloc[:,0]
+    df.rssi = df.rssi.astype('int')
+    
+    # Parse sequence and payload based on your data structure
+    # Your frame format: "0f e4 25 1f..." 
+    # x[3:5] extracts the sequence byte (e.g., 'e4')
+    # NEW: Drop rows where the frame is too short or empty
+    df = df[df.frame.str.len() >= 6]
+    
+    # Parse sequence and payload based on your data structure
     df['seq'] = df.frame.apply(lambda x: int(x[3:5], base=16))
     df['payload'] = df.frame.apply(lambda x: x[6:])
-    # parse the rssi data
-    df.rssi = df.rssi.str.lstrip().str.split(" ", expand=True).iloc[:,0]
-    df.rssi = df.rssi.astype('int')
+    
     df = df.drop(columns=['frame'])
     df.reset_index(inplace=True)
     return df

@@ -194,7 +194,7 @@ int main() {
 
         if (active_baud == DESIRED_BAUD) { 
             // WE ARE CURRENTLY FAST (100k)
-            if (avg_rssi_dbm < -75) { 
+            if (avg_rssi_dbm < -70) { 
                 weak_burst_count++; // Signal is weak, start counting
                 strong_burst_count = 0;
                 
@@ -212,11 +212,11 @@ int main() {
             
         } else { 
             // WE ARE CURRENTLY SLOW (50k)
-            if (avg_rssi_dbm > -60) { // Notice the -60 threshold! It must be MUCH stronger to shift up.
+            if (avg_rssi_dbm > -55) { // Notice the -60 threshold! It must be MUCH stronger to shift up.
                 strong_burst_count++; // Signal is strong, start counting
                 weak_burst_count = 0;
                 
-                if (strong_burst_count >= 3) { // 3 strikes and we shift up
+                if (strong_burst_count >= 1) { // 3 strikes and we shift up
                     current_baud = DESIRED_BAUD;
                     strong_burst_count = 0;
                     printf("Rate: FAST (100k) [SHIFT TRIGGERED]\n");
