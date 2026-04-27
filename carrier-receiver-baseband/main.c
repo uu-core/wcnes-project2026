@@ -34,7 +34,7 @@
 #define RADIO_SCK               18
 
 #define TX_DURATION            250 // send a packet every 250ms (when changing baud-rate, ensure that the TX delay is larger than the transmission time)
-#define RECEIVER              2500 // define the receiver board either 2500 or 1352
+#define RECEIVER              1352 // define the receiver board either 2500 or 1352
 #define PIN_TX1                  6
 #define PIN_TX2                 27
 #define CLOCK_DIV0              20 // larger
@@ -76,8 +76,8 @@ int main() {
     uint16_t instructionBuffer[32] = {0}; // maximal instruction size: 32
     backscatter_program_init(pio, sm, PIN_TX1, PIN_TX2, CLOCK_DIV0, CLOCK_DIV1, DESIRED_BAUD, &backscatter_conf, instructionBuffer, TWOANTENNAS);
 
-    static uint8_t message[buffer_size(PAYLOADSIZE+2, HEADER_LEN)*4] = {0};  // include 10 header bytes
-    static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer
+    static uint8_t message[buffer_size(FEC_PAYLOADSIZE + 2, HEADER_LEN) * 4] = {0}; // include 10 header bytes
+    static uint32_t buffer[buffer_size(FEC_PAYLOADSIZE, HEADER_LEN)] = {0};         // initialize the buffer
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
     uint8_t tx_payload_buffer[PAYLOADSIZE];

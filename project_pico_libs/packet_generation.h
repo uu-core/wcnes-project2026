@@ -14,7 +14,15 @@
 #include "pico/stdlib.h"
 #include "packet_generation.h"
 
-#define PAYLOADSIZE 14
+// DATA_LEN is set by CMake (12, 20, or 52).
+// Falls back to 52 if not set.
+#ifndef DATA_LEN
+#define DATA_LEN 52
+#endif
+
+#define PAYLOADSIZE (DATA_LEN + 2)             // pseudo-seq index + data
+#define FEC_PAYLOADSIZE (DATA_LEN * 7 / 4 + 2) // Hamming(7,4) encoded + index
+
 #define HEADER_LEN  10 // 8 header + length + seq
 #define buffer_size(x, y) (((x + y) % 4 == 0) ? ((x + y) / 4) : ((x + y) / 4 + 1)) // define the buffer size with ceil((PAYLOADSIZE+HEADER_LEN)/4)
 

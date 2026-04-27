@@ -52,3 +52,6 @@ add_compile_options(-Wall
         -Wno-maybe-uninitialized
         )
 
+target_compile_definitions(carrier_receiver_baseband PRIVATE
+    DATA_LEN=12   # options: 12, 20, 52
+)
