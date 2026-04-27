@@ -40,6 +40,7 @@ target_sources(carrier_receiver_baseband PRIVATE
         ../project_pico_libs/receiver_CC2500.c
         ../project_pico_libs/carrier_CC2500.c
         ../project_pico_libs/backscatter.c
+        ../project_pico_libs/fec.c
 )
 include_directories(../project_pico_libs)
 

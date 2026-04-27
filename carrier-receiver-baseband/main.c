@@ -27,6 +27,7 @@
 #include "receiver_CC2500.h"
 #include "packet_generation.h"
 
+#include "fec.h"
 
 #define RADIO_SPI             spi0
 #define RADIO_MISO              16
@@ -81,6 +82,7 @@ int main() {
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
     uint8_t tx_payload_buffer[PAYLOADSIZE];
+    uint8_t tx_encoded_buffer[FEC_PAYLOADSIZE];
 
     /* Setup carrier */
     printf("\nConfiguring one CC2500 as carrier generator:\n");
@@ -126,20 +128,26 @@ int main() {
                     /* generate new data */
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
+                    /* FEC encode: copy pseudo-seq index unchanged, encode data bytes */
+                    tx_encoded_buffer[0] = tx_payload_buffer[0];
+                    tx_encoded_buffer[1] = tx_payload_buffer[1];
+                    hamming_encode(&tx_payload_buffer[2], &tx_encoded_buffer[2], DATA_LEN);
+
                     /* add header (10 byte) to packet */
-                    add_header(&message[0], seq, header_tmplate);
-                    /* add payload to packet */
-                    memcpy(&message[HEADER_LEN], tx_payload_buffer, PAYLOADSIZE);
+                    add_header(&message[0], seq, header_tmplate, FEC_PAYLOADSIZE);
+                    /* add FEC encoded payload to packet */
+                    memcpy(&message[HEADER_LEN], tx_encoded_buffer, FEC_PAYLOADSIZE);
 
                     /* casting for 32-bit fifo */
-                    for (uint8_t i=0; i < buffer_size(PAYLOADSIZE, HEADER_LEN); i++) {
+                    for (uint8_t i = 0; i < buffer_size(FEC_PAYLOADSIZE, HEADER_LEN); i++)
+                    {
                         buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
                     }
                     /* put the data to FIFO (start backscattering) */
                     startCarrier();
                     sleep_ms(1); // wait for carrier to start
-                    backscatter_send(pio,sm,buffer,buffer_size(PAYLOADSIZE, HEADER_LEN));
-                    sleep_ms(ceil((((double) buffer_size(PAYLOADSIZE, HEADER_LEN))*8000.0)/((double) DESIRED_BAUD))+3); // wait transmission duration (+3ms)
+                    backscatter_send(pio, sm, buffer, buffer_size(FEC_PAYLOADSIZE, HEADER_LEN));
+                    sleep_ms(ceil((((double)buffer_size(FEC_PAYLOADSIZE, HEADER_LEN)) * 8000.0) / ((double)DESIRED_BAUD)) + 3); // wait transmission duration (+3ms)
                     stopCarrier();
                     /* increase seq number*/ 
                     seq++;

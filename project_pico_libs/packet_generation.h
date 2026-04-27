@@ -56,7 +56,6 @@ uint16_t generate_sample();
 */
 void generate_data(uint8_t *buffer, uint8_t length, bool include_index);
 
-
 /* including a header to the packet:
  * - 8B header sequence
  * - 1B payload length
@@ -64,7 +63,8 @@ void generate_data(uint8_t *buffer, uint8_t length, bool include_index);
  *
  * packet: buffer to be updated with the header
  * seq: sequence number of the packet
+ * payload_len: length of the payload to be transmitted (PAYLOADSIZE or FEC_PAYLOADSIZE)
  */
-void add_header(uint8_t *packet, uint8_t seq, uint8_t *header_template);
+void add_header(uint8_t *packet, uint8_t seq, uint8_t *header_template, uint8_t payload_len);
 
 #endif
