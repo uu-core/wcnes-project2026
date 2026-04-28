@@ -142,6 +142,137 @@ def compute_ber(df, PACKET_LEN=32):
         print("Warning, the log-file seems empty.")
         return 0.5
 
+def compute_per(df, PACKET_LEN=32):
+    """
+    Compute Packet Error Rate (PER) over received packets only.
+    A packet counts as an error if it has at least one bit error.
+    Lost/missing packets are not counted.
+    """
+    if len(df) == 0:
+        print("Warning, the log-file seems empty.")
+        return 1.0
+    packet_results = [compute_ber_packet(row, PACKET_LEN) for (_, row) in df.iterrows()]
+    packet_errors = [1 if errors > 0 else 0 for (errors, total) in packet_results]
+    return sum(packet_errors) / len(packet_errors)
+
+
+def byte_error_vector(df_row, PACKET_LEN=20, skip_invalid_pseudoseq=True):
+    """
+    Returns a vector of length PACKET_LEN.
+    Each entry is 1 if that byte position was wrong, 0 if correct.
+    Uses only the actual data bytes (payload excluding the first 2 pseudo-sequence bytes).
+    Returns None if the packet is invalid or the pseudo-sequence is not aligned.
+    """
+    payload = parse_payload(df_row.payload)
+    pseudoseq = (payload[0] << 8) + payload[1]
+
+    if skip_invalid_pseudoseq and (pseudoseq % PACKET_LEN != 0):
+        return None
+
+    received_data = payload[2:]
+    expected_data = payload_for_peudo_seq(pseudoseq, PACKET_LEN)
+
+    if len(received_data) != len(expected_data):
+        return None
+
+    return np.array(
+        [1 if rx != exp else 0 for rx, exp in zip(received_data, expected_data)],
+        dtype=int,
+    )
+
+
+# ── Hamming(7,4) decoder ──────────────────────────────────────────────────────
+
+def hamming_decode_nibble(cw):
+    """
+    Decode a 7-bit Hamming(7,4) codeword, correcting any single-bit error.
+
+    Codeword bit layout (bits 6..0):  p1  p2  d1  p3  d2  d3  d4
+    Syndrome: s1 = p1^d1^d2^d4,  s2 = p2^d1^d3^d4,  s3 = p3^d2^d3^d4
+    Error position (1-indexed) = (s1<<2)|(s2<<1)|s3
+    """
+    p1 = (cw >> 6) & 1
+    p2 = (cw >> 5) & 1
+    d1 = (cw >> 4) & 1
+    p3 = (cw >> 3) & 1
+    d2 = (cw >> 2) & 1
+    d3 = (cw >> 1) & 1
+    d4 =  cw        & 1
+
+    s1 = p1 ^ d1 ^ d2 ^ d4
+    s2 = p2 ^ d1 ^ d3 ^ d4
+    s3 = p3 ^ d2 ^ d3 ^ d4
+
+    error_pos = (s1 << 2) | (s2 << 1) | s3  # 1-indexed; 0 means no error
+
+    if error_pos != 0:
+        cw ^= (1 << (7 - error_pos))         # flip the erroneous bit
+        d1 = (cw >> 4) & 1
+        d2 = (cw >> 2) & 1
+        d3 = (cw >> 1) & 1
+        d4 =  cw        & 1
+
+    return (d1 << 3) | (d2 << 2) | (d3 << 1) | d4
+
+
+def hamming_decode(encoded_bytes, data_len):
+    """
+    Decode a Hamming(7,4)-encoded byte array back to original data.
+
+    encoded_bytes : list/array of bytes (length = data_len * 7 // 4)
+    data_len      : number of original data bytes expected
+    Returns       : list of decoded bytes (length = data_len)
+    """
+    in_bit = 0
+    decoded = []
+
+    for _ in range(data_len):
+        nibbles = []
+        for _ in range(2):                        # two nibbles per byte
+            cw = 0
+            for b in range(6, -1, -1):            # read 7 bits MSB-first
+                bit = (encoded_bytes[in_bit // 8] >> (7 - in_bit % 8)) & 1
+                if bit:
+                    cw |= (1 << b)
+                in_bit += 1
+            nibbles.append(hamming_decode_nibble(cw))
+        decoded.append((nibbles[0] << 4) | nibbles[1])
+
+    return decoded
+
+
+def compute_per_fec(df, DATA_LEN):
+    """
+    Compute PER after Hamming(7,4) FEC decoding.
+
+    Expects payload structure: 2 bytes pseudo-seq (unencoded)
+                               + DATA_LEN * 7 // 4 bytes (Hamming-encoded data)
+    DATA_LEN : number of original data bytes (12, 20, or 52)
+    """
+    if len(df) == 0:
+        print("Warning, the log-file seems empty.")
+        return 1.0
+
+    fec_len = DATA_LEN * 7 // 4
+    packet_errors = []
+
+    for _, row in df.iterrows():
+        payload = parse_payload(row.payload)
+        if len(payload) < 2 + fec_len:
+            packet_errors.append(1)
+            continue
+
+        pseudoseq      = int((payload[0] << 8) + payload[1])
+        encoded_rx     = payload[2 : 2 + fec_len]
+        decoded        = hamming_decode(encoded_rx, DATA_LEN)
+        expected       = payload_for_peudo_seq(pseudoseq, DATA_LEN)
+
+        has_error = any(d != e for d, e in zip(decoded, expected))
+        packet_errors.append(1 if has_error else 0)
+
+    return sum(packet_errors) / len(packet_errors)
+
+
 # plot radar chart
 def radar_plot(metrics, system_ref, title):
 
