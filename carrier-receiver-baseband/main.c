@@ -165,7 +165,6 @@ int main()
                 il_row++;
                 if (il_row < INTERLEAVE_ROWS)
                 {
-                    sleep_ms(TX_DURATION);
                     continue;
                 }
                 il_row = 0;

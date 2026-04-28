@@ -277,7 +277,7 @@ def compute_per_fec(df, DATA_LEN):
 def radar_plot(metrics, system_ref, title):
 
     categories = ['Time', 'Reliability', 'Distance']
-    
+
     # system_ref = [62.321888, 0.201875*100, 39.956474923886844]
     system = [metrics[0], metrics[1], metrics[2]]
 
@@ -296,5 +296,92 @@ def radar_plot(metrics, system_ref, title):
 
     lines, labels = plt.thetagrids(np.degrees(label_loc), labels=categories, fontsize=18)
     plt.legend(fontsize=18, loc='upper right')
-    
+
     plt.show()
+
+# ── Block de-interleaver ──────────────────────────────────────────────────────
+
+
+def deinterleave_block(packets, n_rows=64):
+    """
+    Reconstruct the original N_ROWS packets from one interleaved block.
+
+    packets  : list of N_COLS received payloads, each a list of N_ROWS bytes.
+               N_COLS = FEC_PAYLOADSIZE (number of columns in the TX matrix).
+               N_ROWS = INTERLEAVE_ROWS = 64 (depth / number of original packets).
+    n_rows   : INTERLEAVE_ROWS, default 64.
+
+    Returns  : list of n_rows byte-lists, each the original FEC-encoded packet.
+    """
+    n_cols = len(packets[0])  # bytes per interleaved packet = INTERLEAVE_COLS
+    matrix = [[0] * n_cols for _ in range(n_rows)]
+    for col, pkt in enumerate(packets):
+        for row in range(n_rows):
+            matrix[row][col] = pkt[row]
+    return matrix  # matrix[row] = original FEC-encoded packet
+
+
+def compute_per_fec_interleaved(df, DATA_LEN, INTERLEAVE_ROWS=64):
+    """
+    Compute PER after de-interleaving and Hamming(7,4) FEC decoding.
+
+    Expects the capture to contain interleaved packets whose payloads are
+    INTERLEAVE_ROWS bytes (one column of the TX interleaving matrix).
+
+    DATA_LEN       : number of original data bytes (12, 20, or 52).
+    INTERLEAVE_ROWS: depth of the interleaving block (default 64).
+
+    The function groups consecutive received packets into blocks of
+    INTERLEAVE_COLS = DATA_LEN * 7 // 4 + 2  (i.e. FEC_PAYLOADSIZE) columns,
+    de-interleaves each block, FEC-decodes every row, then checks correctness.
+    """
+    if len(df) == 0:
+        print("Warning: the log-file seems empty.")
+        return 1.0
+
+    fec_payload_size = DATA_LEN * 7 // 4 + 2  # = INTERLEAVE_COLS
+    n_cols = fec_payload_size  # packets per block
+
+    packet_errors = []
+
+    # Walk through the dataframe in blocks of n_cols packets
+    for block_start in range(0, len(df) - n_cols + 1, n_cols):
+        block_rows = df.iloc[block_start : block_start + n_cols]
+
+        # Parse each received packet payload into a byte list
+        col_payloads = []
+        valid = True
+        for _, row in block_rows.iterrows():
+            payload = parse_payload(row.payload)
+            if len(payload) != INTERLEAVE_ROWS:
+                valid = False
+                break
+            col_payloads.append(payload)
+
+        if not valid:
+            # Skip malformed blocks
+            continue
+
+        # De-interleave: reconstruct original FEC-encoded packets (rows of matrix)
+        original_packets = deinterleave_block(col_payloads, n_rows=INTERLEAVE_ROWS)
+
+        # FEC decode and check each reconstructed packet
+        for pkt in original_packets:
+            # pkt layout: [pseudo_seq_high, pseudo_seq_low, fec_encoded_data...]
+            if len(pkt) < 2 + DATA_LEN * 7 // 4:
+                packet_errors.append(1)
+                continue
+
+            pseudoseq = (pkt[0] << 8) + pkt[1]
+            encoded_rx = pkt[2 : 2 + DATA_LEN * 7 // 4]
+            decoded = hamming_decode(encoded_rx, DATA_LEN)
+            expected = payload_for_peudo_seq(pseudoseq, DATA_LEN)
+
+            has_error = any(d != e for d, e in zip(decoded, expected))
+            packet_errors.append(1 if has_error else 0)
+
+    if len(packet_errors) == 0:
+        print("Warning: no complete interleaved blocks found.")
+        return 1.0
+
+    return sum(packet_errors) / len(packet_errors)
