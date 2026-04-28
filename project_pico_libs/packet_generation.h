@@ -23,6 +23,12 @@
 #define PAYLOADSIZE (DATA_LEN + 2)             // pseudo-seq index + data
 #define FEC_PAYLOADSIZE (DATA_LEN * 7 / 4 + 2) // Hamming(7,4) encoded + index
 
+#if USE_FEC
+#define ACTIVE_PAYLOADSIZE FEC_PAYLOADSIZE
+#else
+#define ACTIVE_PAYLOADSIZE PAYLOADSIZE
+#endif
+
 #define HEADER_LEN  10 // 8 header + length + seq
 #define buffer_size(x, y) (((x + y) % 4 == 0) ? ((x + y) / 4) : ((x + y) / 4 + 1)) // define the buffer size with ceil((PAYLOADSIZE+HEADER_LEN)/4)
 

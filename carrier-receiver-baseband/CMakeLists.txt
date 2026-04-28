@@ -41,6 +41,7 @@ target_sources(carrier_receiver_baseband PRIVATE
         ../project_pico_libs/carrier_CC2500.c
         ../project_pico_libs/backscatter.c
         ../project_pico_libs/fec.c
+        ../project_pico_libs/interleaver.c
 )
 include_directories(../project_pico_libs)
 
@@ -55,4 +56,6 @@ add_compile_options(-Wall
 
 target_compile_definitions(carrier_receiver_baseband PRIVATE
     DATA_LEN=12   # options: 12, 20, 52
+    USE_FEC=1
+    USE_INTERLEAVING=1
 )

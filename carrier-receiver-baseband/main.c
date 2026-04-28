@@ -28,24 +28,35 @@
 #include "packet_generation.h"
 
 #include "fec.h"
+#include "interleaver.h"
 
-#define RADIO_SPI             spi0
-#define RADIO_MISO              16
-#define RADIO_MOSI              19
-#define RADIO_SCK               18
+/* When interleaving each transmitted packet carries one column = INTERLEAVE_ROWS bytes.
+   When not interleaving each packet carries ACTIVE_PAYLOADSIZE bytes.
+   TX_BUF_PAYLOADSIZE is the larger of the two so static buffers are always big enough. */
+#if USE_INTERLEAVING && (INTERLEAVE_ROWS > ACTIVE_PAYLOADSIZE)
+#define TX_BUF_PAYLOADSIZE INTERLEAVE_ROWS
+#else
+#define TX_BUF_PAYLOADSIZE ACTIVE_PAYLOADSIZE
+#endif
 
-#define TX_DURATION            250 // send a packet every 250ms (when changing baud-rate, ensure that the TX delay is larger than the transmission time)
-#define RECEIVER              1352 // define the receiver board either 2500 or 1352
-#define PIN_TX1                  6
-#define PIN_TX2                 27
-#define CLOCK_DIV0              20 // larger
-#define CLOCK_DIV1              18 // smaller
-#define DESIRED_BAUD        100000
-#define TWOANTENNAS          true
+#define RADIO_SPI spi0
+#define RADIO_MISO 16
+#define RADIO_MOSI 19
+#define RADIO_SCK 18
 
-#define CARRIER_FEQ     2450000000
+#define TX_DURATION 250 // send a packet every 250ms (when changing baud-rate, ensure that the TX delay is larger than the transmission time)
+#define RECEIVER 1352   // define the receiver board either 2500 or 1352
+#define PIN_TX1 6
+#define PIN_TX2 27
+#define CLOCK_DIV0 20 // larger
+#define CLOCK_DIV1 18 // smaller
+#define DESIRED_BAUD 100000
+#define TWOANTENNAS true
 
-int main() {
+#define CARRIER_FEQ 2450000000
+
+int main()
+{
     /* setup SPI */
     stdio_init_all();
     spi_init(RADIO_SPI, 5 * 1000000); // SPI0 at 5MHz.
@@ -77,12 +88,19 @@ int main() {
     uint16_t instructionBuffer[32] = {0}; // maximal instruction size: 32
     backscatter_program_init(pio, sm, PIN_TX1, PIN_TX2, CLOCK_DIV0, CLOCK_DIV1, DESIRED_BAUD, &backscatter_conf, instructionBuffer, TWOANTENNAS);
 
-    static uint8_t message[buffer_size(FEC_PAYLOADSIZE + 2, HEADER_LEN) * 4] = {0}; // include 10 header bytes
-    static uint32_t buffer[buffer_size(FEC_PAYLOADSIZE, HEADER_LEN)] = {0};         // initialize the buffer
+    static uint8_t message[buffer_size(TX_BUF_PAYLOADSIZE + 2, HEADER_LEN) * 4] = {0}; // include 10 header bytes
+    static uint32_t buffer[buffer_size(TX_BUF_PAYLOADSIZE, HEADER_LEN)] = {0};         // initialize the buffer
+
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
     uint8_t tx_payload_buffer[PAYLOADSIZE];
     uint8_t tx_encoded_buffer[FEC_PAYLOADSIZE];
+
+#if USE_INTERLEAVING
+    static uint8_t il_matrix[INTERLEAVE_ROWS][INTERLEAVE_COLS] = {0};
+    static uint8_t il_row = 0;
+    uint8_t tx_interleaved_buffer[INTERLEAVE_ROWS];
+#endif
 
     /* Setup carrier */
     printf("\nConfiguring one CC2500 as carrier generator:\n");
@@ -107,52 +125,86 @@ int main() {
     bool rx_ready = true;
 
     /* loop */
-    while (true) {
+    while (true)
+    {
         evt = get_event();
-        switch(evt){
-            case rx_assert_evt:
-                // started receiving
-                rx_ready = false;
+        switch (evt)
+        {
+        case rx_assert_evt:
+            // started receiving
+            rx_ready = false;
             break;
-            case rx_deassert_evt:
-                // finished receiving
-                time_us = to_us_since_boot(get_absolute_time());
-                status = readPacket(rx_buffer);
-                printPacket(rx_buffer,status,time_us);
-                RX_start_listen();
-                rx_ready = true;
+        case rx_deassert_evt:
+            // finished receiving
+            time_us = to_us_since_boot(get_absolute_time());
+            status = readPacket(rx_buffer);
+            printPacket(rx_buffer, status, time_us);
+            RX_start_listen();
+            rx_ready = true;
             break;
-            case no_evt:
-                // backscatter new packet if receiver is listening
-                if (rx_ready){
-                    /* generate new data */
-                    generate_data(tx_payload_buffer, PAYLOADSIZE, true);
+        case no_evt:
+            // backscatter new packet if receiver is listening
+            if (rx_ready)
+            {
+                /* generate new data */
+                generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
-                    /* FEC encode: copy pseudo-seq index unchanged, encode data bytes */
-                    tx_encoded_buffer[0] = tx_payload_buffer[0];
-                    tx_encoded_buffer[1] = tx_payload_buffer[1];
-                    hamming_encode(&tx_payload_buffer[2], &tx_encoded_buffer[2], DATA_LEN);
+/* FEC encode */
+#if USE_FEC
+                tx_encoded_buffer[0] = tx_payload_buffer[0];
+                tx_encoded_buffer[1] = tx_payload_buffer[1];
+                hamming_encode(&tx_payload_buffer[2], &tx_encoded_buffer[2], DATA_LEN);
+                uint8_t *tx_ready = tx_encoded_buffer;
+#else
+                uint8_t *tx_ready = tx_payload_buffer;
+#endif
 
-                    /* add header (10 byte) to packet */
-                    add_header(&message[0], seq, header_tmplate, FEC_PAYLOADSIZE);
-                    /* add FEC encoded payload to packet */
-                    memcpy(&message[HEADER_LEN], tx_encoded_buffer, FEC_PAYLOADSIZE);
-
-                    /* casting for 32-bit fifo */
-                    for (uint8_t i = 0; i < buffer_size(FEC_PAYLOADSIZE, HEADER_LEN); i++)
-                    {
-                        buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
-                    }
-                    /* put the data to FIFO (start backscattering) */
-                    startCarrier();
-                    sleep_ms(1); // wait for carrier to start
-                    backscatter_send(pio, sm, buffer, buffer_size(FEC_PAYLOADSIZE, HEADER_LEN));
-                    sleep_ms(ceil((((double)buffer_size(FEC_PAYLOADSIZE, HEADER_LEN)) * 8000.0) / ((double)DESIRED_BAUD)) + 3); // wait transmission duration (+3ms)
-                    stopCarrier();
-                    /* increase seq number*/ 
-                    seq++;
+/* Interleave */
+#if USE_INTERLEAVING
+                interleave_block(il_matrix, il_row, tx_ready);
+                il_row++;
+                if (il_row < INTERLEAVE_ROWS)
+                {
+                    sleep_ms(TX_DURATION);
+                    continue;
                 }
-                sleep_ms(TX_DURATION);
+                il_row = 0;
+                for (uint8_t col = 0; col < INTERLEAVE_COLS; col++)
+                {
+                    for (uint8_t row = 0; row < INTERLEAVE_ROWS; row++)
+                    {
+                        tx_interleaved_buffer[row] = il_matrix[row][col];
+                    }
+                    add_header(&message[0], seq, header_tmplate, INTERLEAVE_ROWS);
+                    memcpy(&message[HEADER_LEN], tx_interleaved_buffer, INTERLEAVE_ROWS);
+                    for (uint8_t i = 0; i < buffer_size(INTERLEAVE_ROWS, HEADER_LEN); i++)
+                    {
+                        buffer[i] = ((uint32_t)message[4 * i + 3]) | (((uint32_t)message[4 * i + 2]) << 8) | (((uint32_t)message[4 * i + 1]) << 16) | (((uint32_t)message[4 * i]) << 24);
+                    }
+                    startCarrier();
+                    sleep_ms(1);
+                    backscatter_send(pio, sm, buffer, buffer_size(INTERLEAVE_ROWS, HEADER_LEN));
+                    sleep_ms(ceil((((double)buffer_size(INTERLEAVE_ROWS, HEADER_LEN)) * 8000.0) / ((double)DESIRED_BAUD)) + 3);
+                    stopCarrier();
+                    seq++;
+                    sleep_ms(TX_DURATION);
+                }
+#else
+                add_header(&message[0], seq, header_tmplate, ACTIVE_PAYLOADSIZE);
+                memcpy(&message[HEADER_LEN], tx_ready, ACTIVE_PAYLOADSIZE);
+                for (uint8_t i = 0; i < buffer_size(ACTIVE_PAYLOADSIZE, HEADER_LEN); i++)
+                {
+                    buffer[i] = ((uint32_t)message[4 * i + 3]) | (((uint32_t)message[4 * i + 2]) << 8) | (((uint32_t)message[4 * i + 1]) << 16) | (((uint32_t)message[4 * i]) << 24);
+                }
+                startCarrier();
+                sleep_ms(1);
+                backscatter_send(pio, sm, buffer, buffer_size(ACTIVE_PAYLOADSIZE, HEADER_LEN));
+                sleep_ms(ceil((((double)buffer_size(ACTIVE_PAYLOADSIZE, HEADER_LEN)) * 8000.0) / ((double)DESIRED_BAUD)) + 3);
+                stopCarrier();
+                seq++;
+#endif
+            }
+            sleep_ms(TX_DURATION);
             break;
         }
         sleep_ms(1);
