@@ -8,14 +8,18 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+// Hamming(TOTAL_BITS,DATA_BITS)
+#define TOTAL_BITS 7
+#define DATA_BITS 4
+
 /*
     Encode a payload using hamming code
     byte array: The original payload
     payload_length: The length of the original payload (in bits)
     total_bits: Hamming code total bits (e.g. 7 for Hamming(7,4))
     data_bits: Hamming code data bits (e.g. 4 for Hamming(7,4))
-    returns: new payload with parity bits
+    buffer: returned data
 */
-uint8_t* encode(uint8_t *byte_array, uint8_t payload_length, uint8_t total_bits, uint8_t data_bits);
+void encode(uint8_t *byte_array, uint16_t payload_length_bits, uint8_t total_bits, uint8_t data_bits, uint8_t *buffer);
 
 #endif
