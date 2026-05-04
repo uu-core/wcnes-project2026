@@ -91,13 +91,13 @@ void generate_data(uint8_t *buffer, uint8_t length, bool include_index) {
  * seq: sequence number of the packet
  * header_template: obtained using packet_hdr_template()
  */
-void add_header(uint8_t *packet, uint8_t seq, uint8_t *header_template) {
+void add_header(uint8_t *packet, uint8_t seq, uint8_t len, uint8_t *header_template) {
     /* fill in the header sequence*/
     for(int loop = 0; loop < HEADER_LEN-2; loop++) {
         packet[loop] = header_template[loop];
         }
     /* add the payload length*/
-    packet[HEADER_LEN-2] = 1 + PAYLOADSIZE; // The packet length is defined as the payload data, excluding the length byte and the optional CRC. (cc2500 data sheet, p. 30)
+    packet[HEADER_LEN-2] = 1 + len; // The packet length is defined as the payload data, excluding the length byte and the optional CRC. (cc2500 data sheet, p. 30)
     /* add the packet as sequence number. */
     packet[HEADER_LEN-1] = seq;
 }

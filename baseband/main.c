@@ -52,7 +52,7 @@ int main() {
         pack_bits_to_bytes(encoded_payload_bits, encoded_bits, encoded_payload);
 
         /* add header (10 byte) to packet */
-        add_header(&message[0], seq, header_tmplate);
+        add_header(&message[0], seq, encoded_payload, header_tmplate);
         /* add payload to packet */
         memcpy(&message[HEADER_LEN], encoded_payload, encoded_bytes);
 
