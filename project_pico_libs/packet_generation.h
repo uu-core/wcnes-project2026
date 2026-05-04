@@ -15,7 +15,7 @@
 #include "packet_generation.h"
 
 #define PAYLOADSIZE 14
-#define HEADER_LEN   8 // 8 header + length + seq
+#define HEADER_LEN  10 // 8 header + length + seq
 #define buffer_size(x, y) (((x + y) % 4 == 0) ? ((x + y) / 4) : ((x + y) / 4 + 1)) // define the buffer size with ceil((PAYLOADSIZE+HEADER_LEN)/4)
 
 #ifndef MINMAX
