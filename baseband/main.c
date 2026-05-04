@@ -34,7 +34,7 @@ int main() {
     static uint8_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE; // Make int division ceil to nearest byte
 
     static uint8_t message[buffer_size(encoded_bytes+2, HEADER_LEN)*4] = {0};  // include 10 header bytes
-    static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer
+    static uint32_t buffer[buffer_size(encoded_bytes+2, HEADER_LEN)] = {0}; // initialize the buffer
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
     uint8_t tx_payload_buffer[PAYLOADSIZE];
@@ -57,11 +57,11 @@ int main() {
         memcpy(&message[HEADER_LEN], encoded_payload, encoded_bytes);
 
         /* casting for 32-bit fifo */
-        for (uint8_t i=0; i < buffer_size(encoded_bytes, HEADER_LEN); i++) {
+        for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
             buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
         }
         /* put the data to FIFO */
-        backscatter_send(pio,sm,buffer,buffer_size(encoded_bytes, HEADER_LEN));
+        backscatter_send(pio,sm,buffer,buffer_size(encoded_bytes+2, HEADER_LEN));
         seq++;
         sleep_ms(TX_DURATION);
     }
