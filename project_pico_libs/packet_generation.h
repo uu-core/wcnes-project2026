@@ -57,6 +57,6 @@ void generate_data(uint8_t *buffer, uint8_t length, bool include_index);
  * packet: buffer to be updated with the header
  * seq: sequence number of the packet
  */
-void add_header(uint8_t *packet, uint8_t seq, uint8_t *header_template);
+void add_header(uint8_t *packet, uint8_t seq, uint8_t len, uint8_t *header_template);
 
 #endif

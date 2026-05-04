@@ -26,6 +26,7 @@
 #include "carrier_CC2500.h"
 #include "receiver_CC2500.h"
 #include "packet_generation.h"
+#include "hamming.h"
 
 
 #define RADIO_SPI             spi0
@@ -132,8 +133,14 @@ int main() {
                     /* generate new data */
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
-                    /* add header (10 byte) to packet */
-                    add_header(&message[0], seq, header_tmplate);
+                    /* add header to packet */
+					uint8_t encoded_bits = PAYLOADSIZE * BITS_IN_BYTE
+                        + ceil((double)PAYLOADSIZE * BITS_IN_BYTE/DATA_BITS) * (TOTAL_BITS - DATA_BITS)
+                        + PAYLOADSIZE * BITS_IN_BYTE / DATA_BITS;
+
+                    // Make int division ceil to nearest byte
+                    uint8_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
+                    add_header(&message[0], seq, encoded_bytes, header_tmplate);
                     /* add payload to packet */
                     memcpy(&message[HEADER_LEN], tx_payload_buffer, PAYLOADSIZE);
 

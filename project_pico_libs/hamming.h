@@ -11,6 +11,7 @@
 // Hamming(TOTAL_BITS,DATA_BITS)
 #define TOTAL_BITS 7
 #define DATA_BITS 4
+#define BITS_IN_BYTE 8
 
 /*
     Encode a payload using hamming code

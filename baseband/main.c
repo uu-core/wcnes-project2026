@@ -18,8 +18,6 @@
 #define PIN_TX1 6
 #define PIN_TX2 27
 
-#define BITS_IN_BYTE 8
-
 int main() {
     PIO pio = pio0;
     uint sm = 0;
