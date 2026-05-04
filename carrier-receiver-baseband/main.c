@@ -34,7 +34,7 @@
 #define RADIO_SCK               18
 
 #define TX_DURATION            250 // send a packet every 250ms (when changing baud-rate, ensure that the TX delay is larger than the transmission time)
-#define RECEIVER              2500 // define the receiver board either 2500 or 1352
+#define RECEIVER              1352 // define the receiver board either 2500 or 1352
 #define PIN_TX1                  6
 #define PIN_TX2                 27
 #define CLOCK_DIV0              20 // larger
@@ -101,6 +101,12 @@ int main() {
     set_filter_bandwidth_rx(backscatter_conf.minRxBw);
     sleep_ms(1);
     RX_start_listen();
+
+    // LED indication that listening has started
+    gpio_init(25);
+    gpio_set_dir(25, GPIO_OUT);
+    gpio_put(25, 1);
+
     printf("started listening\n");
     bool rx_ready = true;
 
