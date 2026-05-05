@@ -35,7 +35,7 @@
 #define RADIO_SCK               18
 
 #define TX_DURATION            250 // send a packet every 250ms (when changing baud-rate, ensure that the TX delay is larger than the transmission time)
-#define RECEIVER              2500 // define the receiver board either 2500 or 1352
+#define RECEIVER              1352 // define the receiver board either 2500 or 1352
 #define PIN_TX1                  6
 #define PIN_TX2                 27
 #define CLOCK_DIV0              20 // larger
@@ -134,18 +134,18 @@ int main() {
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
                     /* add header to packet */
-					uint8_t encoded_bits = PAYLOADSIZE * BITS_IN_BYTE
+					uint32_t encoded_bits = PAYLOADSIZE * BITS_IN_BYTE
                         + ceil((double)PAYLOADSIZE * BITS_IN_BYTE/DATA_BITS) * (TOTAL_BITS - DATA_BITS)
                         + PAYLOADSIZE * BITS_IN_BYTE / DATA_BITS;
 
                     // Make int division ceil to nearest byte
-                    uint8_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
+                    uint32_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
                     add_header(&message[0], seq, encoded_bytes, header_tmplate);
                     /* add payload to packet */
                     memcpy(&message[HEADER_LEN], tx_payload_buffer, PAYLOADSIZE);
 
                     /* casting for 32-bit fifo */
-                    for (uint8_t i=0; i < buffer_size(PAYLOADSIZE, HEADER_LEN); i++) {
+                    for (uint32_t i=0; i < buffer_size(PAYLOADSIZE, HEADER_LEN); i++) {
                         buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
                     }
                     /* put the data to FIFO (start backscattering) */
