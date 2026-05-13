@@ -81,7 +81,7 @@ int main() {
     static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
-    uint8_t tx_payload_buffer[PAYLOADSIZE];
+    uint8_t tx_payload_buffer[255];
 
     /* Setup carrier */
     printf("\nConfiguring one CC2500 as carrier generator:\n");
@@ -111,6 +111,15 @@ int main() {
     printf("started listening\n");
     bool rx_ready = true;
 
+    // Hamming code packet length calculation
+    uint32_t encoded_bits = PAYLOADSIZE * BITS_IN_BYTE
+        + ceil((double)PAYLOADSIZE * BITS_IN_BYTE/DATA_BITS) * (TOTAL_BITS - DATA_BITS)
+        + PAYLOADSIZE * BITS_IN_BYTE / DATA_BITS;
+
+    // Make int division ceil to nearest byte
+    uint32_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
+    printf("Encoded payload length: %d\n", encoded_bytes);
+
     /* loop */
     while (true) {
         evt = get_event();
@@ -134,12 +143,6 @@ int main() {
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
                     /* add header to packet */
-					uint32_t encoded_bits = PAYLOADSIZE * BITS_IN_BYTE
-                        + ceil((double)PAYLOADSIZE * BITS_IN_BYTE/DATA_BITS) * (TOTAL_BITS - DATA_BITS)
-                        + PAYLOADSIZE * BITS_IN_BYTE / DATA_BITS;
-
-                    // Make int division ceil to nearest byte
-                    uint32_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
                     add_header(&message[0], seq, encoded_bytes, header_tmplate);
                     /* add payload to packet */
                     memcpy(&message[HEADER_LEN], tx_payload_buffer, PAYLOADSIZE);

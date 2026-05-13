@@ -9,8 +9,8 @@
 #include <inttypes.h>
 
 // Hamming(TOTAL_BITS,DATA_BITS)
-#define TOTAL_BITS 7
-#define DATA_BITS 4
+#define TOTAL_BITS 127
+#define DATA_BITS 120
 #define BITS_IN_BYTE 8
 
 /*
