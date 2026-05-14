@@ -22,11 +22,11 @@
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
-#include "backscatter.h"
-#include "carrier_CC2500.h"
-#include "receiver_CC2500.h"
-#include "packet_generation.h"
-#include "hamming.h"
+#include "../project_pico_libs/backscatter.h"
+#include "../project_pico_libs/carrier_CC2500.h"
+#include "../project_pico_libs/receiver_CC2500.h"
+#include "../project_pico_libs/packet_generation.h"
+#include "../project_pico_libs/hamming.h"
 
 
 #define RADIO_SPI             spi0
@@ -77,8 +77,8 @@ int main() {
     uint16_t instructionBuffer[32] = {0}; // maximal instruction size: 32
     backscatter_program_init(pio, sm, PIN_TX1, PIN_TX2, CLOCK_DIV0, CLOCK_DIV1, DESIRED_BAUD, &backscatter_conf, instructionBuffer, TWOANTENNAS);
 
-    static uint8_t message[buffer_size(PAYLOADSIZE+2, HEADER_LEN)*4] = {0};  // include 10 header bytes
-    static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer
+    // static uint8_t message[buffer_size(PAYLOADSIZE+2, HEADER_LEN)*4] = {0};  // include 10 header bytes
+    // static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer
     static uint8_t seq = 0;
     uint8_t *header_tmplate = packet_hdr_template(RECEIVER);
     uint8_t tx_payload_buffer[255];
@@ -120,6 +120,9 @@ int main() {
     uint32_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
     printf("Encoded payload length: %d\n", encoded_bytes);
 
+    uint8_t message[buffer_size(encoded_bytes+2, HEADER_LEN)*4];  // include 10 header bytes
+    uint32_t buffer[buffer_size(encoded_bytes+2, HEADER_LEN)]; // initialize the buffer
+
     /* loop */
     while (true) {
         evt = get_event();
@@ -142,19 +145,29 @@ int main() {
                     /* generate new data */
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
 
+
+                    // Encode payload with hamming, method creates array with BITS in each array index
+                    uint8_t encoded_payload_bits[encoded_bits];
+                    // Bits array to byte array for payload
+                    uint8_t encoded_payload[encoded_bytes];
+                    encode(tx_payload_buffer, PAYLOADSIZE * BITS_IN_BYTE, TOTAL_BITS, DATA_BITS, encoded_payload);
+                    
+
+                    pack_bits_to_bytes(encoded_payload_bits, encoded_bits, encoded_payload);
+
                     /* add header to packet */
-                    add_header(&message[0], seq, encoded_bytes, header_tmplate);
+                    add_header(&message[0], seq, encoded_bytes+2, header_tmplate);
                     /* add payload to packet */
-                    memcpy(&message[HEADER_LEN], tx_payload_buffer, PAYLOADSIZE);
+                    memcpy(&message[HEADER_LEN], encoded_payload, encoded_bytes);
 
                     /* casting for 32-bit fifo */
-                    for (uint32_t i=0; i < buffer_size(PAYLOADSIZE, HEADER_LEN); i++) {
+                    for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
                         buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
                     }
                     /* put the data to FIFO (start backscattering) */
                     startCarrier();
                     sleep_ms(1); // wait for carrier to start
-                    backscatter_send(pio,sm,buffer,buffer_size(PAYLOADSIZE, HEADER_LEN));
+                    backscatter_send(pio,sm,buffer,buffer_size(encoded_bytes+2, HEADER_LEN));
                     sleep_ms(ceil((((double) buffer_size(PAYLOADSIZE, HEADER_LEN))*8000.0)/((double) DESIRED_BAUD))+3); // wait transmission duration (+3ms)
                     stopCarrier();
                     /* increase seq number*/ 

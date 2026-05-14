@@ -29,7 +29,7 @@ void fill_zeroes(uint8_t *arr, uint16_t length)
  */
 void pack_bits_to_bytes(const uint8_t *src, size_t src_len, uint8_t *dest) {
     if (src == NULL || dest == NULL || src_len == 0) {
-        return 0;
+        return;
     }
 
     size_t dest_len = (src_len + 7) / 8; // Ceiling division

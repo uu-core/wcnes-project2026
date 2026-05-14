@@ -9,8 +9,8 @@
 #include <inttypes.h>
 
 // Hamming(TOTAL_BITS,DATA_BITS)
-#define TOTAL_BITS 127
-#define DATA_BITS 120
+#define TOTAL_BITS 3
+#define DATA_BITS 1
 #define BITS_IN_BYTE 8
 
 /*
@@ -21,6 +21,7 @@
     data_bits: Hamming code data bits (e.g. 4 for Hamming(7,4))
     buffer: returned data
 */
+void pack_bits_to_bytes(const uint8_t *src, size_t src_len, uint8_t *dest);
 void encode(uint8_t *byte_array, uint16_t payload_length_bits, uint8_t total_bits, uint8_t data_bits, uint8_t *buffer);
 
 #endif
