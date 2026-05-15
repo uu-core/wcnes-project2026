@@ -120,11 +120,14 @@ int main() {
     uint32_t encoded_bytes = (encoded_bits + BITS_IN_BYTE - 1) / BITS_IN_BYTE;  
     printf("Encoded payload length: %d\n", encoded_bytes);
 
-    uint8_t message[buffer_size(encoded_bytes+2, HEADER_LEN)*4];  // include 10 header bytes
-    uint32_t buffer[buffer_size(encoded_bytes+2, HEADER_LEN)]; // initialize the buffer
+
+    int count = 0;
 
     /* loop */
-    while (true) {
+    while (count < 200) {
+        volatile uint8_t message[buffer_size(encoded_bytes+2, HEADER_LEN)*4];  // include 10 header bytes
+        volatile uint32_t buffer[buffer_size(encoded_bytes+2, HEADER_LEN)]; // initialize the buffer
+        count++;
         evt = get_event();
         switch(evt){
             case rx_assert_evt:
@@ -144,16 +147,24 @@ int main() {
                 if (rx_ready){
                     /* generate new data */
                     generate_data(tx_payload_buffer, PAYLOADSIZE, true);
-
-
+                    // printf("Generated data: ");
+                    // for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
+                    //     printf("%x", tx_payload_buffer[i]);
+                    // }
+                    // printf("\n");
                     // Encode payload with hamming, method creates array with BITS in each array index
                     uint8_t encoded_payload_bits[encoded_bits];
                     // Bits array to byte array for payload
                     uint8_t encoded_payload[encoded_bytes];
-                    encode(tx_payload_buffer, PAYLOADSIZE * BITS_IN_BYTE, TOTAL_BITS, DATA_BITS, encoded_payload);
+                    hencode(tx_payload_buffer, PAYLOADSIZE * BITS_IN_BYTE, TOTAL_BITS, DATA_BITS, encoded_payload_bits);
                     
 
                     pack_bits_to_bytes(encoded_payload_bits, encoded_bits, encoded_payload);
+                    // printf("Packed and encoded data: ");
+                    // for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
+                    //     printf("%x", encoded_payload[i]);
+                    // }
+                    // printf("\n");
 
                     /* add header to packet */
                     add_header(&message[0], seq, encoded_bytes+2, header_tmplate);
@@ -161,14 +172,17 @@ int main() {
                     memcpy(&message[HEADER_LEN], encoded_payload, encoded_bytes);
 
                     /* casting for 32-bit fifo */
-                    for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
-                        buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
-                    }
+                    // printf("Buffer data: ");
+                    // for (uint8_t i=0; i < buffer_size(encoded_bytes+2, HEADER_LEN); i++) {
+                    //     buffer[i] = ((uint32_t) message[4*i+3]) | (((uint32_t) message[4*i+2]) << 8) | (((uint32_t) message[4*i+1]) << 16) | (((uint32_t)message[4*i]) << 24);
+                    //     printf("%x", buffer[i]);
+                    // }
+                    // printf("\n");
                     /* put the data to FIFO (start backscattering) */
                     startCarrier();
                     sleep_ms(1); // wait for carrier to start
                     backscatter_send(pio,sm,buffer,buffer_size(encoded_bytes+2, HEADER_LEN));
-                    sleep_ms(ceil((((double) buffer_size(PAYLOADSIZE, HEADER_LEN))*8000.0)/((double) DESIRED_BAUD))+3); // wait transmission duration (+3ms)
+                    sleep_ms(ceil((((double) buffer_size(encoded_bytes+2, HEADER_LEN))*8000.0)/((double) DESIRED_BAUD))+3); // wait transmission duration (+3ms)
                     stopCarrier();
                     /* increase seq number*/ 
                     seq++;
@@ -178,6 +192,7 @@ int main() {
         }
         sleep_ms(1);
     }
+    gpio_put(25, 0); // turn off led when done
 
     /* stop carrier and receiver - never reached */
     RX_stop_listen();
