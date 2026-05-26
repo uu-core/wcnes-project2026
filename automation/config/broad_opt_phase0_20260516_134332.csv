@@ -1,0 +1,4 @@
+run_id,clock_div0,clock_div1,desired_baud,bw_offsets,enabled,notes
+d40_d36_b100k,40,36,100000,0,1,phase0_current_recommendation_anchor_bw470p9k
+d36_d32_b100k,36,32,100000,1,1,phase0_historical_strong_anchor_bw621p6k
+d28_d26_b100k,28,26,100000,1,1,phase0_old_baseline_anchor_bw546p3k

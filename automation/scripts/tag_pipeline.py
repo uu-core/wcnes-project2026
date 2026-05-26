@@ -4,7 +4,7 @@
 Scope is intentionally narrow:
 - patch only the tag experiment entry macros in `carrier-receiver-baseband/main.c`
 - optionally build and flash
-- parse the final `set rx ...` receiver parameters from tag serial output
+- parse the CC1352 receiver target settings from tag serial output
 """
 
 from __future__ import annotations
@@ -18,7 +18,14 @@ import time
 from pathlib import Path
 from typing import Dict, Tuple
 
-PARAM_PATTERNS = {
+CC1352_TARGET_PATTERNS = {
+    "rx_base_freq_hz": re.compile(r"base_frequency:\s*(\d+)", re.IGNORECASE),
+    "baudrate": re.compile(r"data_rate:\s*(\d+)", re.IGNORECASE),
+    "deviation_hz": re.compile(r"deviation:\s*(\d+)", re.IGNORECASE),
+    "rx_bandwidth_hz": re.compile(r"rx_bandwidth_min:\s*(\d+)", re.IGNORECASE),
+}
+
+LEGACY_CC2500_PATTERNS = {
     "rx_base_freq_hz": re.compile(r"set\s+rx\s+f_carrier.*\]\s*(\d+)", re.IGNORECASE),
     "deviation_hz": re.compile(r"set\s+rx\s+f_dev:.*\]\s*(\d+)", re.IGNORECASE),
     "baudrate": re.compile(r"set\s+rx\s+r_data:.*\]\s*(\d+)", re.IGNORECASE),
@@ -133,17 +140,26 @@ def flash_tag(build_dir: Path, elf_name: str, picotool_path: str) -> None:
     )
 
 
-def parse_settings_from_lines(lines: list[str]) -> Dict[str, int]:
+def parse_settings_from_lines_with_patterns(lines: list[str], patterns: dict[str, re.Pattern[str]]) -> Dict[str, int]:
     parsed: Dict[str, int] = {}
     for line in lines:
-        for key, pat in PARAM_PATTERNS.items():
+        for key, pat in patterns.items():
             m = pat.search(line)
             if m:
                 parsed[key] = int(m.group(1))
-    missing = [k for k in PARAM_PATTERNS.keys() if k not in parsed]
+    missing = [k for k in patterns.keys() if k not in parsed]
     if missing:
         raise RuntimeError(f"Missing parsed fields from serial output: {missing}")
     return parsed
+
+
+def parse_settings_from_lines(lines: list[str]) -> Dict[str, int]:
+    try:
+        return parse_settings_from_lines_with_patterns(lines, CC1352_TARGET_PATTERNS)
+    except RuntimeError:
+        # Backward compatibility for old firmware logs. New automation should
+        # use CC1352 target settings, not CC2500 quantized register values.
+        return parse_settings_from_lines_with_patterns(lines, LEGACY_CC2500_PATTERNS)
 
 
 def read_serial_settings(port: str, baud: int, timeout_s: int, log_file: Path) -> Dict[str, int]:
@@ -165,7 +181,7 @@ def read_serial_settings(port: str, baud: int, timeout_s: int, log_file: Path) -
             lines.append(line)
             fp.write(line + "\n")
             fp.flush()
-            if "set rx f_carrier" in line:
+            if "CC1352 receiver target settings" in line or "set rx f_carrier" in line:
                 # keep reading a bit more to capture the other receiver fields
                 time.sleep(0.8)
             try:
@@ -206,6 +222,11 @@ def run_single(
     time.sleep(2)
 
     parsed = read_serial_settings(serial_port, serial_baud, serial_timeout_s, serial_log_file)
+    if int(parsed["rx_base_freq_hz"]) <= 0:
+        raise RuntimeError(
+            "Parsed CC1352 base_frequency is zero or invalid. "
+            "Rebuild/flash the tag so it prints a valid CC1352 receiver target block."
+        )
     return parsed
 
 

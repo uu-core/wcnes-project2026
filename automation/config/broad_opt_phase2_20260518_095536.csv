@@ -1,0 +1,11 @@
+run_id,clock_div0,clock_div1,desired_baud,bw_offsets,enabled,notes
+d34_d32_b100k,34,32,100000,,1,phase2_top_per_multiple_bw_and_strong_ber
+d36_d32_b100k,36,32,100000,,1,phase2_historical_anchor_strong_phase0_and_phase1
+d36_d34_b100k,36,34,100000,,1,phase2_best_phase1_ber_at_bw_plus2
+d38_d32_b100k,38,32,100000,,1,phase2_top_per_and_wide_deviation_candidate
+d36_d30_b100k,36,30,100000,,1,phase2_top_per_wider_deviation_candidate
+d32_d30_b100k,32,30,100000,,1,phase2_top_per_higher_offset_candidate
+d34_d30_b100k,34,30,100000,,1,phase2_good_per_and_low_ber_candidate
+d38_d34_b100k,38,34,100000,,1,phase2_good_ber_and_low_offset_neighbor
+d40_d38_b100k,40,38,100000,,1,phase2_low_offset_valid_boundary_candidate
+d28_d26_b100k,28,26,100000,,1,phase2_phase0_anchor_and_low_ber_baseline

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+automation/logs/
+automation/results/
+outputs/
+codex_blind_selfopt_workspace/
+
+carrier-receiver-baseband/build/

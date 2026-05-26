@@ -41,12 +41,12 @@
 #define RECEIVER              1352 // define the receiver board either 2500 or 1352
 #define PIN_TX1                  6
 #define PIN_TX2                 27
-#define CLOCK_DIV0       20 // larger
-#define CLOCK_DIV1       18 // smaller
+#define CLOCK_DIV0       34 // larger
+#define CLOCK_DIV1       32 // smaller
 #define DESIRED_BAUD     100000
 #define TWOANTENNAS          true
 
-#define CARRIER_FEQ     2450000000
+#define CARRIER_FEQ     2450000000UL
 
 int main() {
     /* setup SPI */
@@ -79,6 +79,12 @@ int main() {
     struct backscatter_config backscatter_conf;
     uint16_t instructionBuffer[32] = {0}; // maximal instruction size: 32
     backscatter_program_init(pio, sm, PIN_TX1, PIN_TX2, CLOCK_DIV0, CLOCK_DIV1, DESIRED_BAUD, &backscatter_conf, instructionBuffer, TWOANTENNAS);
+    uint32_t cc1352_base_frequency = (uint32_t)CARRIER_FEQ + backscatter_conf.center_offset;
+    printf("CC1352 receiver target settings:\n");
+    printf("- base_frequency: %lu\n", (unsigned long)cc1352_base_frequency);
+    printf("- data_rate: %lu\n", (unsigned long)backscatter_conf.baudrate);
+    printf("- deviation: %lu\n", (unsigned long)backscatter_conf.deviation);
+    printf("- rx_bandwidth_min: %lu\n", (unsigned long)backscatter_conf.minRxBw);
 
     static uint8_t message[buffer_size(PAYLOADSIZE+2, HEADER_LEN)*4] = {0};  // include 10 header bytes
     static uint32_t buffer[buffer_size(PAYLOADSIZE, HEADER_LEN)] = {0}; // initialize the buffer

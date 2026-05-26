@@ -15,7 +15,7 @@ The intended workflow is:
    - patch tag parameters in `carrier-receiver-baseband/main.c`
    - optionally build and flash the tag
    - read tag serial output
-   - parse receiver settings from the final `set rx ...` lines
+   - parse CC1352 receiver target settings from the tag output
    - launch SmartRF Studio GUI automation
    - repeat the full scan plan for the configured number of rounds
    - save raw logs grouped by `run_id`
@@ -32,6 +32,25 @@ Outputs are intentionally limited to:
 - `automation/results/<campaign_id>/analysis/comparison_metrics.png`
 
 No per-run JSON bridge files are generated.
+
+## Receiver settings source
+
+The automation uses the tag's `CC1352 receiver target settings` block as the
+source for SmartRF Studio inputs:
+
+```text
+CC1352 receiver target settings:
+- base_frequency: <Hz>
+- data_rate: <baud>
+- deviation: <Hz>
+- rx_bandwidth_min: <Hz>
+```
+
+These values are the theoretical target values derived from the tag-side
+`d0/d1/baud` configuration. SmartRF Studio then selects the closest practical
+CC1352 settings through its own GUI controls. The older `set rx ...` lines are
+still printed by the firmware for the onboard CC2500 helper path, but they are
+CC2500-quantized values and are no longer the preferred automation input.
 
 ## Parameter input
 
@@ -78,6 +97,49 @@ Before the first run, open `automation/run.ps1` and set:
 
 The Python runner is still available if you need it, but the intended daily
 entry point is now `automation/run.ps1`.
+
+## Carson bandwidth validation
+
+To validate the Carson-rule receiver bandwidth choice for `d0=28`, `d1=26`,
+and `baud=100000`, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\automation\run_carson_bw_test.ps1
+```
+
+This focused runner builds/flashes the tag once, reads the CC1352 target
+settings from tag serial output, then tests three SmartRF RX Filter BW settings:
+
+- one SmartRF dropdown option below the theoretical Carson bandwidth
+- the smallest SmartRF dropdown option greater than or equal to the Carson bandwidth
+- one SmartRF dropdown option above that ceiling choice
+
+The dedicated plot is saved as:
+
+- `automation/results/<campaign_id>/analysis/carson_bw_validation.png`
+
+## Candidate d0/d1 plus bandwidth sweep
+
+To retest the strongest `d0/d1` candidates across three receiver bandwidth
+choices, edit:
+
+- `automation/config/candidate_bw_sweep.csv`
+
+Then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\automation\run_candidate_bw_sweep.ps1
+```
+
+For each enabled candidate, the runner builds/flashes the tag once, then tests:
+
+- `BW -1`: one SmartRF RX bandwidth option below the Carson ceiling
+- `BW 0`: the smallest SmartRF option greater than or equal to the Carson bandwidth
+- `BW +1`: one option above the Carson ceiling
+
+The report-focused grouped bar chart is saved as:
+
+- `automation/results/<campaign_id>/analysis/candidate_bw_sweep_bars.png`
 
 ## Stop the run
 

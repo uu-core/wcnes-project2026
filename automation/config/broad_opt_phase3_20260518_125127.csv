@@ -1,0 +1,4 @@
+run_id,clock_div0,clock_div1,desired_baud,bw_offsets,enabled,notes
+d34_d32_b100k,34,32,100000,-1;1,1,phase3_confirm_per_ber_best_bw_minus1_and_stable_bw_plus1
+d36_d32_b100k,36,32,100000,1,1,phase3_confirm_historical_anchor_bw_plus1
+d38_d32_b100k,38,32,100000,0;1,1,phase3_confirm_wide_deviation_competitor_bw0_and_bw_plus1

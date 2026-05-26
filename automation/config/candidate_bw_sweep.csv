@@ -1,0 +1,7 @@
+run_id,clock_div0,clock_div1,desired_baud,enabled,notes
+d28_d26_b100k,28,26,100000,1,previous_best_per
+d34_d32_b100k,34,32,100000,1,strong_comparison
+d36_d32_b100k,36,32,100000,1,low_per_candidate
+d26_d24_b100k,26,24,100000,1,low_per_candidate
+d36_d34_b100k,36,34,100000,1,low_ber_candidate
+d24_d22_b100k,24,22,100000,1,stable_candidate
