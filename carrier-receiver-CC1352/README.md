@@ -26,7 +26,9 @@ In the control panel, choose `2.4G frequency band`, `Packet RX`
 ## A screenshot of the SmartRF configuration as receiver
 ![plot](./SmartRF_1352.png)
 ## Backscatter Tag Configuration
-Please change the Macro variable RECEIVER to 1352.
+Please change the macro variable RECEIVER to 1352.
+
+By default, TWOANTENNAS is set to false. The transmitting antenna should be connected to PIN_TX1 (which is set to 6 by default). Change TWOANTENNAS to true if you want to use two antennas for transmission.
 
 ## Reference
 [CC1352P7 Datasheet](https://www.ti.com/product/CC1352P7)

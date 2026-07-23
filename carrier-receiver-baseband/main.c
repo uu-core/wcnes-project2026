@@ -40,13 +40,16 @@
 #define CLOCK_DIV0              20 // larger
 #define CLOCK_DIV1              18 // smaller
 #define DESIRED_BAUD        100000
-#define TWOANTENNAS          true
+#define TWOANTENNAS          false // set to true if two antennas are used for backscattering, otherwise set to false
+#define LED_BLINKING        500000  // corresponds to 500ms per LED state
 
 #define CARRIER_FEQ     2450000000
 
 int main() {
     /* setup SPI */
     stdio_init_all();
+    gpio_init(PICO_DEFAULT_LED_PIN);                // for blinking the onboard LED as an indicator
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
     spi_init(RADIO_SPI, 5 * 1000000); // SPI0 at 5MHz.
     gpio_set_function(RADIO_SCK, GPIO_FUNC_SPI);
     gpio_set_function(RADIO_MOSI, GPIO_FUNC_SPI);
@@ -68,6 +71,10 @@ int main() {
     bi_decl(bi_1pin_with_name(CARRIER_CSN, "SPI Carrier CS"));
 
     sleep_ms(5000);
+
+    // Timer variables for blinking of onboard LED
+    uint64_t last_blink = 0;
+    bool led_state = false;
 
     /* setup backscatter state machine */
     PIO pio = pio0;
@@ -106,6 +113,13 @@ int main() {
 
     /* loop */
     while (true) {
+        // blink onboard LED
+        uint64_t now = to_us_since_boot(get_absolute_time());
+        if (now - last_blink >= LED_BLINKING) {
+            last_blink = now;
+            led_state = !led_state;
+            gpio_put(PICO_DEFAULT_LED_PIN, led_state);
+        }
         evt = get_event();
         switch(evt){
             case rx_assert_evt:
@@ -154,3 +168,4 @@ int main() {
     RX_stop_listen();
     stopCarrier();
 }
+
